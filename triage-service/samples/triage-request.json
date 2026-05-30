@@ -1,0 +1,11 @@
+{
+  "log": "2026-05-27T03:14:01Z INFO Starting validation for workflow WF-2026-0099831\n2026-05-27T03:14:07Z ERROR Schema validation failed: field rightsWindow.end is null\n2026-05-27T03:14:07Z ERROR Workflow validation failed for WF-2026-0099831",
+  "metadata": {
+    "workflowId": "WF-2026-0099831",
+    "failureStage": "VALIDATION",
+    "pipeline": "content-prod",
+    "component": "validation-worker",
+    "environment": "prod",
+    "timestamp": "2026-05-27T03:14:07Z"
+  }
+}

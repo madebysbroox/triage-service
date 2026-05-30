@@ -1,0 +1,5 @@
+2026-05-27T03:14:01Z INFO Starting validation for workflow WF-2026-0099831
+2026-05-27T03:14:03Z INFO Loading manifest manifest.xml
+2026-05-27T03:14:05Z INFO Validating rights metadata
+2026-05-27T03:14:07Z ERROR Schema validation failed: field rightsWindow.end is null
+2026-05-27T03:14:07Z ERROR Workflow validation failed for WF-2026-0099831
