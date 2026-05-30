@@ -1,11 +1,11 @@
 package com.example.triage.service;
 
 import com.example.triage.model.TriageResponse;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.json.JsonMapper;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -17,10 +17,10 @@ import java.util.Map;
 @Service
 public class AuditService {
     private static final Logger auditLogger = LoggerFactory.getLogger("TRIAGE_AUDIT");
-    private final ObjectMapper objectMapper;
+    private final JsonMapper jsonMapper;
 
-    public AuditService(ObjectMapper objectMapper) {
-        this.objectMapper = objectMapper;
+    public AuditService(JsonMapper jsonMapper) {
+        this.jsonMapper = jsonMapper;
     }
 
     public void emit(String rawLog, TriageResponse response) {
@@ -39,8 +39,8 @@ public class AuditService {
         audit.put("confidence", response.triage().confidenceScore());
         audit.put("humanReviewRequired", response.triage().humanReviewRequired());
         try {
-            auditLogger.info(objectMapper.writeValueAsString(audit));
-        } catch (JsonProcessingException e) {
+            auditLogger.info(jsonMapper.writeValueAsString(audit));
+        } catch (JacksonException e) {
             auditLogger.warn("Unable to serialize triage audit event", e);
         }
     }

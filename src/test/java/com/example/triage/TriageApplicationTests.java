@@ -1,16 +1,15 @@
 package com.example.triage;
 
 import com.example.triage.model.*;
-import com.example.triage.service.RedactionService;
 import com.example.triage.service.RedactionResult;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import com.example.triage.service.RedactionService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
+import tools.jackson.databind.json.JsonMapper;
 
 import java.time.OffsetDateTime;
 
@@ -24,7 +23,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @AutoConfigureMockMvc
 class TriageApplicationTests {
     @Autowired MockMvc mockMvc;
-    @Autowired ObjectMapper objectMapper;
+    @Autowired JsonMapper jsonMapper;
     @Autowired RedactionService redactionService;
 
     @Test
@@ -57,19 +56,16 @@ class TriageApplicationTests {
                 )
         );
 
-        String response = mockMvc.perform(post("/v1/triage")
+        mockMvc.perform(post("/v1/triage")
                         .header("x-api-key", "local-dev-key")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(request)))
+                        .content(jsonMapper.writeValueAsString(request)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.provider").value("mock"))
                 .andExpect(jsonPath("$.triage.errorClassification").value("SCHEMA_VALIDATION"))
                 .andExpect(jsonPath("$.triage.likelyOwningTeam").value("Content Validation Team"))
                 .andExpect(jsonPath("$.triage.humanReviewRequired").value(false))
-                .andReturn().getResponse().getContentAsString();
-
-        JsonNode json = objectMapper.readTree(response);
-        assertThat(json.get("triage").get("evidenceFromLog").get(0).get("lineNumber").asInt()).isEqualTo(1);
+                .andExpect(jsonPath("$.triage.evidenceFromLog[0].lineNumber").value(1));
     }
 
     @Test

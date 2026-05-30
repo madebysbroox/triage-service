@@ -1,0 +1,35 @@
+server:
+  port: ${PORT:8080}
+  servlet:
+    context-path: /
+  tomcat:
+    max-http-form-post-size: 1MB
+    max-swallow-size: 1MB
+
+spring:
+  application:
+    name: triage-service
+
+management:
+  endpoint:
+    health:
+      probes:
+        enabled: true
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+
+triage:
+  provider: ${TRIAGE_PROVIDER:mock}
+  api-key: ${TRIAGE_API_KEY:local-dev-key}
+  max-body-bytes: ${TRIAGE_MAX_BODY_BYTES:1048576}
+  log-slicing:
+    max-lines: ${TRIAGE_LOG_MAX_LINES:120}
+    context-before: ${TRIAGE_LOG_CONTEXT_BEFORE:3}
+    context-after: ${TRIAGE_LOG_CONTEXT_AFTER:6}
+  gating:
+    min-confidence: ${TRIAGE_MIN_CONFIDENCE:0.75}
+    force-review-severities: ${TRIAGE_FORCE_REVIEW_SEVERITIES:HIGH,CRITICAL}
+  model:
+    id: ${TRIAGE_MODEL_ID:mock-deterministic-v1}

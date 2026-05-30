@@ -1,16 +1,16 @@
 package com.example.triage.service;
 
 import com.example.triage.model.FailureMetadata;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.stereotype.Service;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.json.JsonMapper;
 
 @Service
 public class PromptBuilder {
-    private final ObjectMapper objectMapper;
+    private final JsonMapper jsonMapper;
 
-    public PromptBuilder(ObjectMapper objectMapper) {
-        this.objectMapper = objectMapper;
+    public PromptBuilder(JsonMapper jsonMapper) {
+        this.jsonMapper = jsonMapper;
     }
 
     public String systemPrompt() {
@@ -53,8 +53,8 @@ public class PromptBuilder {
 
     private String toJson(FailureMetadata metadata) {
         try {
-            return objectMapper.writeValueAsString(metadata);
-        } catch (JsonProcessingException e) {
+            return jsonMapper.writeValueAsString(metadata);
+        } catch (JacksonException e) {
             return "{}";
         }
     }
