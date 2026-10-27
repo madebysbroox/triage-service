@@ -13,11 +13,15 @@
     <groupId>com.example</groupId>
     <artifactId>triage-service</artifactId>
     <version>0.1.0-SNAPSHOT</version>
-    <name>Triage Service - Spring Boot POC</name>
+    <name>Triage Service</name>
     <description>Read-only AI-enriched failure classification and summarization POC for operational workflow failures.</description>
 
     <properties>
         <java.version>21</java.version>
+        <anthropic-java.version>3.2.0</anthropic-java.version>
+        <!-- Tests tagged "live" call paid APIs and are off unless the live-eval profile is active. -->
+        <surefire.excludedGroups>live</surefire.excludedGroups>
+        <surefire.groups></surefire.groups>
     </properties>
 
     <dependencies>
@@ -38,6 +42,11 @@
             <artifactId>spring-boot-starter-actuator</artifactId>
         </dependency>
         <dependency>
+            <groupId>com.anthropic</groupId>
+            <artifactId>anthropic-java</artifactId>
+            <version>${anthropic-java.version}</version>
+        </dependency>
+        <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-test</artifactId>
             <scope>test</scope>
@@ -55,6 +64,25 @@
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
             </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <configuration>
+                    <excludedGroups>${surefire.excludedGroups}</excludedGroups>
+                    <groups>${surefire.groups}</groups>
+                </configuration>
+            </plugin>
         </plugins>
     </build>
+
+    <profiles>
+        <!-- Runs only the golden set against real Claude: mvn verify -Plive-eval (needs ANTHROPIC_API_KEY). -->
+        <profile>
+            <id>live-eval</id>
+            <properties>
+                <surefire.excludedGroups></surefire.excludedGroups>
+                <surefire.groups>live</surefire.groups>
+            </properties>
+        </profile>
+    </profiles>
 </project>

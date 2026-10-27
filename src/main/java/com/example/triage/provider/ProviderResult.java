@@ -5,5 +5,10 @@ import com.example.triage.model.TriageResult;
 public record ProviderResult(
         String provider,
         String model,
-        TriageResult triageResult
-) {}
+        TriageResult triageResult,
+        TokenUsage usage
+) {
+    public ProviderResult(String provider, String model, TriageResult triageResult) {
+        this(provider, model, triageResult, TokenUsage.NONE);
+    }
+}

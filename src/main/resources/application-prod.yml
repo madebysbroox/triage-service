@@ -10,6 +10,4 @@ management:
 
 triage:
   api-key: ${TRIAGE_API_KEY}
-  provider: ${TRIAGE_PROVIDER:bedrock}
-  model:
-    id: ${TRIAGE_MODEL_ID:anthropic.claude-3-5-sonnet-20240620-v1:0}
+  provider: ${TRIAGE_PROVIDER:anthropic}

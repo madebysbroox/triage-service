@@ -30,6 +30,10 @@ public class AuditService {
         audit.put("provider", response.provider());
         audit.put("model", response.model());
         audit.put("latencyMs", response.latencyMs());
+        audit.put("providerLatencyMs", response.providerLatencyMs());
+        audit.put("inputTokens", response.usage().inputTokens());
+        audit.put("outputTokens", response.usage().outputTokens());
+        audit.put("estimatedCostUsd", response.usage().estimatedCostUsd());
         audit.put("redactionsApplied", response.redactionsApplied());
         audit.put("logLinesIn", response.logLinesIn());
         audit.put("logLinesUsed", response.logLinesUsed());

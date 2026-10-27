@@ -1,8 +1,22 @@
 # Triage Service
 
+[![ci](https://github.com/madebysbroox/triage-service/actions/workflows/ci.yml/badge.svg)](https://github.com/madebysbroox/triage-service/actions/workflows/ci.yml)
+
 A read-only Spring Boot service for AI-enriched classification and summarization of failed operational workflows across ingestion, packaging, validation, delivery, and other backend services.
 
 The service accepts a failed workflow log and/or failure metadata, redacts sensitive values, slices the log down to relevant evidence windows, calls a provider-agnostic `LlmProvider`, validates the structured triage result, applies deterministic human-review gates, and emits an audit log.
+
+The model never gets the last word. Its answer is parsed against a schema, every line it quotes as evidence is checked against the log it was shown, and anything uncertain, severe, unverifiable or refused goes to a human. A labelled golden set measures both how often the answer is right and whether a case that needed a human ever slipped through.
+
+## How a request flows
+
+1. **Redact** secrets, tokens, keys, emails, IPs and connection strings before anything leaves the service.
+2. **Slice** long logs down to windows around error lines, keeping original line numbers.
+3. **Ask the provider.** `anthropic` calls Claude with structured outputs, so the reply is parsed straight into `TriageResult`. `mock` is a deterministic keyword baseline for local runs and CI.
+4. **Validate and gate.** Schema violations fall back to `UNKNOWN`. Review is forced when confidence is below the threshold, severity is HIGH or CRITICAL, the class is UNKNOWN, or any evidence line does not match the slice.
+5. **Audit and measure.** One JSON audit event per request (raw input stored only as a SHA-256 hash) and Micrometer metrics for classification, review rate, provider latency, tokens, cost and failures.
+
+A provider error, timeout or refusal never fails the request: it becomes an `UNKNOWN` result that requires review, and `triage.provider.failures` is incremented.
 
 ## Current Shape
 
@@ -14,8 +28,15 @@ src/main/java/com/example/triage
   config/       API key, request size, bound configuration
   controller/   REST controllers and exception handling
   model/        request/response DTOs and enums
-  provider/     provider abstraction, mock provider, Bedrock adapter stub
-  service/      redaction, log slicing, validation/gating, audit, orchestration
+  provider/     provider abstraction, Claude provider, mock baseline, Bedrock stub
+  service/      redaction, log slicing, validation/gating, audit, metrics, orchestration
+
+src/test/java/com/example/triage
+  eval/         golden-set evaluator and report
+  provider/     Claude provider against a local Messages API stub
+  service/      redaction, slicing, gating and failure-path unit tests
+
+src/test/resources/golden/golden-set.jsonl   35 labelled failure logs
 ```
 
 No large package reshuffle is needed for a deployable service. Before production, replace `com.example` and the Maven `groupId` with your organization-owned package name.
@@ -55,9 +76,11 @@ Response:
   "provider": "mock",
   "model": "mock-deterministic-v1",
   "latencyMs": 12,
+  "providerLatencyMs": 11,
   "redactionsApplied": 0,
   "logLinesIn": 1,
   "logLinesUsed": 1,
+  "usage": { "inputTokens": 0, "outputTokens": 0, "estimatedCostUsd": 0.0 },
   "triage": {
     "plainEnglishSummary": "...",
     "likelyRootCause": "...",
@@ -116,14 +139,40 @@ Runtime configuration is externalized through environment variables:
 | `PORT` | `8080` | HTTP port |
 | `SPRING_PROFILES_ACTIVE` | unset | Use `prod` in AWS |
 | `TRIAGE_API_KEY` | `local-dev-key` | Shared API key; required in `prod` |
-| `TRIAGE_PROVIDER` | `mock` | `mock` locally, `bedrock` in AWS |
-| `TRIAGE_MODEL_ID` | `mock-deterministic-v1` | Provider model identifier |
+| `TRIAGE_PROVIDER` | `mock` (`anthropic` in `prod`) | `mock`, `anthropic`, or `bedrock` (stub) |
+| `TRIAGE_MODEL_ID` | `mock-deterministic-v1` | Model id reported by the mock and Bedrock providers |
+| `ANTHROPIC_API_KEY` | unset | Required when the provider is `anthropic` |
+| `TRIAGE_ANTHROPIC_MODEL` | `claude-opus-5-5` | Claude model |
+| `TRIAGE_ANTHROPIC_EFFORT` | `low` | `low` to `max`; classification rarely needs more than `low` |
+| `TRIAGE_ANTHROPIC_MAX_TOKENS` | `4096` | Output cap; hitting it is treated as a provider failure |
+| `TRIAGE_ANTHROPIC_FALLBACKS` | `true` | Let the API re-run a declined request on its recommended fallback model |
+| `TRIAGE_ANTHROPIC_INPUT_USD_PER_MTOK` / `_OUTPUT_` | `4.00` / `20.00` | Prices used for the per-request cost estimate |
 | `TRIAGE_MAX_BODY_BYTES` | `1048576` | Request size limit |
 | `TRIAGE_LOG_MAX_LINES` | `120` | Max sliced lines sent to provider |
 | `TRIAGE_LOG_CONTEXT_BEFORE` | `3` | Lines before relevant log event |
 | `TRIAGE_LOG_CONTEXT_AFTER` | `6` | Lines after relevant log event |
 | `TRIAGE_MIN_CONFIDENCE` | `0.75` | Human-review confidence gate |
 | `TRIAGE_FORCE_REVIEW_SEVERITIES` | `HIGH,CRITICAL` | Severities that require review |
+
+## Evaluation
+
+`src/test/resources/golden/golden-set.jsonl` holds 35 labelled failures from a content delivery pipeline: schema and XSD errors, malformed XML, missing S3 objects, checksum and manifest mismatches, timeouts, auth and IAM failures, database conflicts, XSLT and OpenXML failures, a disk-full worker, a prompt-injection attempt hidden in a log line, a log with a credential in it, and logs with no usable signal. Each case is labelled with the expected classification, severity, and whether a human must see it.
+
+The evaluator runs every case through the whole pipeline and scores what a caller would get back:
+
+- **Unsafe auto-approvals** — a case that needed a human went out without review. This must be zero; the build fails otherwise.
+- **Classification and severity accuracy.**
+- **Review rate and needless reviews** — how much work the gates send to people.
+- **Provider latency p50 / p99 and total cost** for the set.
+
+```bash
+mvn verify                                        # mock baseline, runs on every build
+ANTHROPIC_API_KEY=sk-ant-... mvn verify -Plive-eval   # the same set against Claude
+```
+
+Reports are written to `target/eval/mock.md` and `target/eval/claude.md`. CI publishes the mock report on every run; the `ci` workflow's manual run with **live_eval** checked runs the Claude eval using the `ANTHROPIC_API_KEY` repository secret.
+
+The mock is a keyword matcher and scores 28.6% on classification with zero unsafe auto-approvals: it is the floor any model has to beat, and it shows the gates hold even when the provider is bad. The Claude run has to reach 80% with zero unsafe auto-approvals to pass.
 
 ## Container Build
 
@@ -213,9 +262,10 @@ Use HTTP port `8080`, target type `ip`, and health check path:
 
 ```text
 SPRING_PROFILES_ACTIVE=prod
-TRIAGE_PROVIDER=bedrock
-TRIAGE_MODEL_ID=<bedrock-model-id>
+TRIAGE_PROVIDER=anthropic
+TRIAGE_ANTHROPIC_MODEL=claude-opus-5-5
 TRIAGE_API_KEY=<from Secrets Manager>
+ANTHROPIC_API_KEY=<from Secrets Manager>
 ```
 
 9. Verify deployment:
@@ -230,7 +280,9 @@ curl -s -X POST https://<service-domain>/v1/triage \
 
 ## GitHub Actions CI/CD
 
-The example workflow lives at `.github/workflows/ci-cd.example.yml`. To activate it, rename it to `ci-cd.yml`.
+`.github/workflows/ci.yml` runs on every push and pull request: build, unit tests, and the mock golden-set eval, with the report in the job summary.
+
+The deploy example lives at `.github/workflows/ci-cd.example.yml`. To activate it, rename it to `ci-cd.yml`.
 
 The pipeline shape is:
 
@@ -274,13 +326,15 @@ public interface LlmProvider {
 }
 ```
 
-`MockLlmProvider` is deterministic and runs offline. `BedrockLlmProvider` is intentionally still a stub. To finish Bedrock support, add the AWS SDK Bedrock Runtime client, serialize prompts with `PromptBuilder`, parse the model response into `TriageResult`, and continue to let `TriageValidationService` enforce deterministic gates.
+`AnthropicLlmProvider` uses the official Anthropic Java SDK. It sends the system and user prompts from `PromptBuilder`, asks for structured output typed as `TriageResult`, and returns token usage and an estimated cost. A `refusal` stop reason becomes `ProviderRefusalException`, and a `max_tokens` stop is treated as a failure rather than parsed as a partial answer; both end in human review.
+
+`MockLlmProvider` is deterministic and runs offline. `BedrockLlmProvider` is still a stub. To finish it, use the SDK's Bedrock backend with the same request, so the gates and the golden set apply unchanged.
 
 ## Production Readiness Notes
 
 - Keep `/v1/triage` read-only and authenticated.
 - Store secrets in Secrets Manager, not environment files or source control.
 - Do not log raw submitted logs; the audit event stores a SHA-256 hash of the raw input.
-- Add Micrometer counters for classification, severity, review rate, and provider latency.
-- Add golden-set tests with representative failed workflow logs before switching the production provider from `mock` to `bedrock`.
+- Alert on `triage.requests` with `review=true` and on `triage.provider.failures`: a jump in either means the model or the logs have changed.
+- Grow the golden set from real failures that were reviewed and corrected, and rerun the live eval before changing the model, effort, or prompts.
 - Consider replacing API-key auth with an internal gateway, mTLS, OAuth2 resource server, or IAM-authenticated private API Gateway if this becomes a shared platform service.

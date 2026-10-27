@@ -28,7 +28,9 @@ public class TriageValidationService {
             return fallback("Provider returned invalid triage output: " + violations.iterator().next().getMessage(), slice);
         }
 
-        boolean evidenceMismatch = result.evidenceFromLog().stream().noneMatch(slice::containsEvidence);
+        // Every quoted line must exist in the slice the model saw. One invented line is
+        // enough to distrust the rest of the answer.
+        boolean evidenceMismatch = !result.evidenceFromLog().stream().allMatch(slice::containsEvidence);
         boolean forceReview = result.humanReviewRequired()
                 || result.confidenceScore() < properties.gating().minConfidence()
                 || result.errorClassification() == ErrorClassification.UNKNOWN
