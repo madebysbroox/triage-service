@@ -24,17 +24,21 @@
         },
         {
           "name": "TRIAGE_PROVIDER",
-          "value": "bedrock"
+          "value": "anthropic"
         },
         {
-          "name": "TRIAGE_MODEL_ID",
-          "value": "anthropic.claude-3-5-sonnet-20240620-v1:0"
+          "name": "TRIAGE_ANTHROPIC_MODEL",
+          "value": "claude-opus-5-5"
         }
       ],
       "secrets": [
         {
           "name": "TRIAGE_API_KEY",
           "valueFrom": "arn:aws:secretsmanager:<region>:<account-id>:secret:triage-service/api-key"
+        },
+        {
+          "name": "ANTHROPIC_API_KEY",
+          "valueFrom": "arn:aws:secretsmanager:<region>:<account-id>:secret:triage-service/anthropic-api-key"
         }
       ],
       "logConfiguration": {

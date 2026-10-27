@@ -33,3 +33,12 @@ triage:
     force-review-severities: ${TRIAGE_FORCE_REVIEW_SEVERITIES:HIGH,CRITICAL}
   model:
     id: ${TRIAGE_MODEL_ID:mock-deterministic-v1}
+  anthropic:
+    api-key: ${ANTHROPIC_API_KEY:}
+    base-url: ${ANTHROPIC_BASE_URL:https://api.anthropic.com}
+    model: ${TRIAGE_ANTHROPIC_MODEL:claude-opus-5-5}
+    max-tokens: ${TRIAGE_ANTHROPIC_MAX_TOKENS:4096}
+    effort: ${TRIAGE_ANTHROPIC_EFFORT:low}
+    fallbacks: ${TRIAGE_ANTHROPIC_FALLBACKS:true}
+    input-usd-per-mtok: ${TRIAGE_ANTHROPIC_INPUT_USD_PER_MTOK:4.00}
+    output-usd-per-mtok: ${TRIAGE_ANTHROPIC_OUTPUT_USD_PER_MTOK:20.00}
